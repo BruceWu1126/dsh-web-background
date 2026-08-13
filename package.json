@@ -1,0 +1,40 @@
+{
+  "name": "dsh-web-background",
+  "version": "0.1.0",
+  "description": "DeepSeek Harness web UI background customization plugin (settings section + theme token overrides)",
+  "private": true,
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "client": {
+      "platform": "web",
+      "inject": [],
+      "immediately": true
+    }
+  },
+  "scripts": {
+    "check": "node --check lib/index.js && node --check lib/client.js && npm test",
+    "test": "node test/run-client.mjs && node test/host-schema-check.mjs && node test/wire-schema-check.mjs && node test/render-section.mjs"
+  },
+  "dependencies": {
+    "@deepseek-ai/schemastery": "3.18.1"
+  },
+  "devDependencies": {
+    "@deepseek-ai/dsh-client-schema-form": "0.1.0-rc.6",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}
