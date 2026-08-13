@@ -22,8 +22,8 @@
     }
   },
   "scripts": {
-    "check": "node --check lib/index.js && node --check lib/client.js && npm test",
-    "test": "node test/run-client.mjs && node test/host-schema-check.mjs && node test/wire-schema-check.mjs && node test/render-section.mjs"
+    "check": "node --check lib/index.js && node --check lib/client.js && node --check install.mjs && npm test",
+    "test": "node test/run-client.mjs && node test/host-schema-check.mjs && node test/wire-schema-check.mjs && node test/render-section.mjs && node test/install-script.test.mjs"
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "3.18.1"

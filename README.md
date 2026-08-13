@@ -6,55 +6,91 @@ DeepSeek Harness Web UI 背景自定义插件。安装后，设置面板（左�
 
 - **纯色**：为浅色 / 深色模式分别指定背景色（附预设色卡）。
 - **渐变**：分别设置浅色 / 深色模式的起止颜色和角度（附预设渐变）。
-- **图片**：http(s) 链接或 data URL，支持铺放方式（覆盖 / 包含 / 平铺）、暗化程度（0–80% 遮罩提升文字可读性）以及加载兜底色。
+- **图片**：http(s) 链接或 data URL，支持本地图片导入（≤1 MB）、铺放方式（覆盖 / 包含 / 平铺）、暗化程度（0–80% 遮罩提升文字可读性）以及加载兜底色。
 - **浅色 / 深色独立取值**：通过主题系统的 token 覆盖层实现，跟随 UI 的明暗模式自动切换。
 - **侧边栏联动**：可选择是否把背景同时应用到侧边栏。
-- **持久化**：设置通过 Host settings 文档写入 `settings.yaml`，刷新页面 / 重启后自动恢复；「恢复默认」一键清除。
-
-## 工作原理
-
-- Host 半（`lib/index.js`）：注册 `web-background` 设置命名空间（schemastery schema），把设置落到 `settings.yaml`。
-- 浏览器半（`lib/client.js`）：绑定该设置作用域，把 `--dsw-alias-bg-base`（主背景）与可选的 `--dsw-specific-sidebar-fill`（侧边栏）以 `{light, dark}` 覆盖层叠加到活动主题上（`ctx.theme.overrideTokens`），并注册设置页面。
+- **即时响应**：所有改动乐观更新（界面与背景立即生效），写入防抖合并；持久化到 `settings.yaml`，刷新 / 重启后自动恢复，「恢复默认」一键清除。
 
 ## 兼容性
 
-当前版本针对 DeepSeek Harness `0.1.0-rc.6` 验证。Harness 仍处于开发者预览阶段，内部设置白名单或主题 token 变更后可能需要同步适配。
+当前版本针对 DeepSeek Harness `0.1.0-rc.6` 验证。Harness 仍处于开发者预览阶段，内部设置白名单或主题 token 变更后可能需要同步适配（见下文「dsh 升级后」）。
 
-## 安装（无 pnpm 的手工安装）
+## 要求
 
-1. 确定 DSH 数据目录，并从 GitHub 安装插件及其运行依赖：
+- Node.js ≥ 20
+- 已安装并**至少成功运行过一次** `dsh web`（首次运行会创建 `$DSH_HOME/profiles` 及模块回退链接，安装脚本依赖它们定位 DSH 安装目录）
+- Windows / macOS / Linux 均可
+
+## 快速安装（推荐）
+
+```sh
+git clone https://github.com/BruceWu1126/dsh-web-background.git
+cd dsh-web-background
+node install.mjs
+```
+
+然后**重启 `dsh web`**（终端 Ctrl+C 后重新运行），刷新页面，打开设置 →「背景」。
+
+可用参数：
+
+| 参数 | 作用 | 默认值 |
+|---|---|---|
+| `--dsh-home <path>` | 指定 Harness 数据目录 | `$DSH_HOME` 环境变量，否则 `~/.dsh` |
+| `--profile <name>` | 要打补丁的 profile | `web` |
+| `--uninstall` | 完整卸载并还原备份 | — |
+
+## 安装脚本做了什么
+
+`install.mjs` 共四步（每步都幂等，可重复运行）：
+
+1. **复制插件本体**到 `$DSH_HOME/profiles/node_modules/dsh-web-background`（profile 共享模块目录）。
+2. **注册插件行**：在 `$DSH_HOME/profiles/<profile>/cordis.patch.yml` 中追加 Loader 的 `insert` 条目。
+3. **暴露设置命名空间（必须）**：`0.1.0-rc.6` 的 Web 设置通道只服务 `dsh-host-apiproxy` 里一份**硬编码白名单**（`WEB_SETTINGS_NAMESPACES`），产品尚未提供第三方插件自声明暴露设置的机制（源码注释标注为 deferred work）。脚本把 `"web-background"` 加入该白名单——不做这步，设置页会一直显示「设置暂不可用」。
+4. **导航图标（可选，外观）**：设置面板导航行的图标由 `dsh-client-ui-settings-general` 硬编码，未知 id 一律回退成齿轮图标。脚本给 `background` 补一个图片图标分支。
+
+第 3、4 步会修改 DSH **安装目录**里的文件（通过 `$DSH_HOME/profiles/node_modules` 的引导回退链接定位真实位置）。每次修改前都会把原文件备份为 `<file>.dsh-wb-backup`，`--uninstall` 会原样还原。这两处补丁是当前产品版本的权宜之计，待 Harness 提供正式扩展点后即可移除。
+
+## 手工安装（备选，不用安装脚本）
+
+1. 用 npm 安装插件本体（或直接手动复制本仓库到 `$DSH_HOME/profiles/node_modules/dsh-web-background`）：
    ```powershell
    $dshHome = if ($env:DSH_HOME) { $env:DSH_HOME } else { Join-Path $env:USERPROFILE '.dsh' }
    npm.cmd install --prefix (Join-Path $dshHome 'profiles') 'https://github.com/BruceWu1126/dsh-web-background.git'
    ```
-2. 在 `$dshHome\profiles\web\cordis.patch.yml` 中加入插件：
+2. 在 `$dshHome\profiles\web\cordis.patch.yml` 中加入：
    ```yaml
    - insert:
        - id: web-background
          name: dsh-web-background
    ```
-3. **暴露设置命名空间**：`0.1.0-rc.6` 的 Web 设置通道只服务一份硬编码白名单。在当前 DSH 安装中的 `node_modules/@deepseek-ai/dsh-host-apiproxy/lib/index.js` 找到 `WEB_SETTINGS_NAMESPACES`，加入 `"web-background"`。升级或重装 DSH 后需要重新检查这项补丁。
-4. 重启 `dsh web`（插件集合与 Host 代码的变化都在重启后生效），打开设置 →「背景」。
-
-> 第 3 步会修改 Harness 的安装文件。修改前应备份目标文件；这项限制需要由 Harness 后续提供插件自声明设置命名空间的机制才能消除。
+3. 在 DSH 安装目录的 `node_modules/@deepseek-ai/dsh-host-apiproxy/lib/index.js` 中，把 `"web-background"` 加入 `WEB_SETTINGS_NAMESPACES` 数组（**必做**，改前备份文件）。
+4. （可选）在 `node_modules/@deepseek-ai/dsh-client-ui-settings-general/lib/client.js` 的 `navIcon(id)` 中给 `id === "background"` 加一个图标分支，否则显示齿轮图标。
+5. 重启 `dsh web`，打开设置 →「背景」。
 
 ## 卸载
 
-1. 从 `cordis.patch.yml` 中删除上述 `insert` 块。
-2. 运行 `npm.cmd uninstall --prefix (Join-Path $dshHome 'profiles') dsh-web-background`。
-3. 重启 `dsh web`；`settings.yaml` 中的 `web-background:` 段可保留或手动删除。
+```sh
+node install.mjs --uninstall
+```
+
+还原两个产品文件与 profile 补丁文件、删除插件目录（`settings.yaml` 里的 `web-background:` 段可保留，无副作用）。手工安装的按上述步骤逆向删除即可。
+
+## dsh 升级后
+
+Harness 升级（`npx` 缓存重建 / 重新安装）会覆盖两个产品补丁。**重新运行一次 `node install.mjs`** 即可：脚本会检测到补丁缺失并重新应用（备份不会重复覆盖原始文件）。插件本体在 `$DSH_HOME` 下不受影响。
 
 ## 测试
 
-```powershell
-npm.cmd ci
-npm.cmd run check
+```sh
+npm ci
+npm run check
 ```
 
-测试覆盖客户端主题覆盖层与本地编辑合并、Host schema 默认值与边界、Host → Web schema 序列化，以及 React 设置页的四种渲染状态。
+测试覆盖客户端主题覆盖层与本地编辑合并、Host schema 默认值与边界、Host → 浏览器 schema 序列化、React 设置页渲染，以及安装器的安装、重复运行、卸载、已有白名单兼容和 profile 路径约束。
 
 ## 已知限制
 
 - 渐变 / 图片模式下，`--dsw-alias-bg-base` 不再是一个纯色，少量用 `color-mix(...)` 引用该 token 的加载扫光动画（消息行 shimmer）会停止绘制，不影响功能。
 - 远程浏览器（非本机回环地址）以内存模式运行，设置仅当次会话有效，不写入 `settings.yaml`。
+- 本地图片导入上限 1 MB（设置写入本地配置文件，内嵌不宜过大）；更大的图片请用 http(s) 链接。
 - 修改插件代码后需要重启 `dsh web`（无 HMR watcher 时）；新插件集合本身也只在重启时扫描。
