@@ -3,9 +3,10 @@
  * Cross-platform installer for the dsh-web-background plugin.
  *
  *   node install.mjs                     install into the default dsh home
- *   node install.mjs --dsh-home <path>   explicit harness home
+ *   node install.mjs --dsh-home <path>   explicit harness home (`~` is expanded)
  *   node install.mjs --profile <name>    profile to patch (default: web)
  *   node install.mjs --uninstall         remove everything, restore backups
+ *   node install.mjs --help              print usage, including Linux / Windows examples
  *
  * What it does (install):
  *   1. copies the plugin into $DSH_HOME/profiles/node_modules/dsh-web-background
@@ -31,6 +32,8 @@ import { homedir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 
 const pluginDir = dirname(fileURLToPath(import.meta.url))
+const defaultDshHome = join(homedir(), '.dsh')
+const isWindows = process.platform === 'win32'
 
 function flag(name) {
   const i = process.argv.indexOf(name)
@@ -40,9 +43,45 @@ function flag(name) {
   return value
 }
 
+/** Expand a leading `~` so `--dsh-home ~/.dsh` works even if the shell did not expand it. */
+function expandHome(path) {
+  if (path === '~') return homedir()
+  if (path.startsWith('~/') || path.startsWith('~\\')) return join(homedir(), path.slice(2))
+  return path
+}
+
+function printHelp() {
+  const unixHome = '~/.dsh'
+  const winHome = '%USERPROFILE%\\.dsh'
+  console.log(`Usage: node install.mjs [options]
+
+  --dsh-home <path>   Harness data directory (default: $DSH_HOME or ${isWindows ? winHome : unixHome})
+  --profile <name>    Profile to patch (default: web)
+  --uninstall         Restore backups and remove the plugin
+  -h, --help          Show this help
+
+Linux / macOS:
+  npx @deepseek-ai/dsh web    # run once so ~/.dsh/profiles exists
+  node install.mjs
+  node install.mjs --dsh-home ~/.dsh
+  node install.mjs --uninstall
+
+Windows (PowerShell):
+  npx @deepseek-ai/dsh web
+  node install.mjs
+  node install.mjs --dsh-home $env:USERPROFILE\\.dsh
+
+Switching OS does not copy $DSH_HOME. Re-run this script on the other system.`)
+}
+
+if (process.argv.includes('--help') || process.argv.includes('-h')) {
+  printHelp()
+  process.exit(0)
+}
+
 const uninstall = process.argv.includes('--uninstall')
 const profile = flag('--profile') ?? 'web'
-const dshHome = flag('--dsh-home') ?? process.env.DSH_HOME ?? join(homedir(), '.dsh')
+const dshHome = expandHome(flag('--dsh-home') ?? process.env.DSH_HOME ?? defaultDshHome)
 
 if (profile === '.' || profile === '..' || /[\\/]/.test(profile)) fail(`invalid --profile "${profile}": must be a bare profile name`)
 if (/^~/.test(profile)) fail(`invalid --profile "${profile}": "~" is not expanded here; pass an absolute path with --dsh-home instead`)
@@ -213,7 +252,13 @@ function doUninstall() {
 
 function doInstall() {
   console.log('Installing dsh-web-background into ' + dshHome + ' (profile: ' + profile + ')')
-  if (!existsSync(profileDir)) fail(`profile directory not found: ${profileDir} — run \`dsh ${profile === 'web' ? 'web' : '--profile ' + profile}\` once first so dsh creates it`)
+  if (typeof process.getuid === 'function' && process.getuid() === 0) {
+    warn('running as root; dsh data usually lives in the login user\'s ~/.dsh, not /root/.dsh')
+  }
+  if (!existsSync(profileDir)) {
+    const launch = profile === 'web' ? 'web' : '--profile ' + profile
+    fail(`profile directory not found: ${profileDir} — run \`npx @deepseek-ai/dsh ${launch}\` once first so dsh creates ${isWindows ? '%USERPROFILE%\\.dsh' : '~/.dsh'}/profiles/${profile}`)
+  }
 
   // 1. plugin package
   mkdirSync(targetDir, { recursive: true })
@@ -227,7 +272,7 @@ function doInstall() {
 
   // 3. settings allowlist (required for persistence)
   const apiproxyDir = realProductDir('dsh-host-apiproxy')
-  if (apiproxyDir === undefined) fail('cannot locate the dsh install through ' + join(modulesDir, '@deepseek-ai', 'dsh-host-apiproxy') + ' — run `dsh web` once (it heals the module fallback links), then re-run')
+  if (apiproxyDir === undefined) fail('cannot locate the dsh install through ' + join(modulesDir, '@deepseek-ai', 'dsh-host-apiproxy') + ' — run `npx @deepseek-ai/dsh web` once (it heals the module fallback links), then re-run')
   const apiproxyFile = join(apiproxyDir, 'lib', 'index.js')
   const apiproxyOutcome = patchProduct(apiproxyFile, APIPROXY_ANCHOR, APIPROXY_REPLACEMENT, APIPROXY_MARKER, '\t"web-background"')
   if (apiproxyOutcome === 'anchor-missing') fail(`dsh-host-apiproxy/lib/index.js does not contain the expected WEB_SETTINGS_NAMESPACES anchor (different dsh version?) — apply the allowlist patch manually: add "web-background" to that array`)

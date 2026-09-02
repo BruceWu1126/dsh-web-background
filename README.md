@@ -17,27 +17,50 @@ DeepSeek Harness Web UI 背景自定义插件。安装后，设置面板（左�
 
 ## 要求
 
-- Node.js ≥ 20
-- 已安装并**至少成功运行过一次** `dsh web`（首次运行会创建 `$DSH_HOME/profiles` 及模块回退链接，安装脚本依赖它们定位 DSH 安装目录）
-- Windows / macOS / Linux 均可
+- Node.js ≥ 20（DeepSeek Harness 本身建议 Node.js 22+）
+- 已安装并**至少成功运行过一次** `dsh web` 或 `npx @deepseek-ai/dsh web`（首次运行会创建 `$DSH_HOME/profiles` 及模块回退链接，安装脚本依赖它们定位 DSH 安装目录）
+- Windows / macOS / Linux 均可；换系统后需要在新系统再装一次（见下表）
+
+| 系统 | 默认 `$DSH_HOME` | 用来安装的终端 |
+|---|---|---|
+| Linux | `~/.dsh` | bash / zsh |
+| macOS | `~/.dsh` | zsh / bash |
+| Windows | `%USERPROFILE%\.dsh` | PowerShell |
+
+切换操作系统不会带走 Harness 数据：Linux 的 `~/.dsh` 和 Windows 的 `%USERPROFILE%\.dsh` 互不相通。在另一边开机后，先再跑一次 `npx @deepseek-ai/dsh web`，再执行 `node install.mjs`。背景设置写在该系统的 `$DSH_HOME/settings.yaml`，不会自动同步。
 
 ## 快速安装（推荐）
 
+Linux / macOS：
+
 ```sh
+# 1. 若尚未运行过 Harness，先创建 ~/.dsh/profiles（浏览器打开后即可 Ctrl+C 停掉）
+npx @deepseek-ai/dsh web
+
+# 2. 安装本插件
 git clone https://github.com/BruceWu1126/dsh-web-background.git
 cd dsh-web-background
 node install.mjs
 ```
 
+Windows（PowerShell）同样是 `git clone` 后 `node install.mjs`；数据目录默认是 `%USERPROFILE%\.dsh`。
+
 然后**重启 `dsh web`**（终端 Ctrl+C 后重新运行），刷新页面，打开设置 →「背景」。
+
+查看安装器参数：
+
+```sh
+node install.mjs --help
+```
 
 可用参数：
 
 | 参数 | 作用 | 默认值 |
 |---|---|---|
-| `--dsh-home <path>` | 指定 Harness 数据目录 | `$DSH_HOME` 环境变量，否则 `~/.dsh` |
+| `--dsh-home <path>` | 指定 Harness 数据目录（`~` 会展开为家目录） | `$DSH_HOME`，否则 Linux/macOS 为 `~/.dsh`、Windows 为 `%USERPROFILE%\.dsh` |
 | `--profile <name>` | 要打补丁的 profile | `web` |
 | `--uninstall` | 完整卸载并还原备份 | — |
+| `--help` | 打印各系统用法 | — |
 
 ## 安装脚本做了什么
 
@@ -52,12 +75,23 @@ node install.mjs
 
 ## 手工安装（备选，不用安装脚本）
 
-1. 用 npm 安装插件本体（或直接手动复制本仓库到 `$DSH_HOME/profiles/node_modules/dsh-web-background`）：
+1. 用 npm 安装插件本体（或直接手动复制本仓库到 `$DSH_HOME/profiles/node_modules/dsh-web-background`）。
+
+   Linux / macOS：
+
+   ```sh
+   dshHome="${DSH_HOME:-$HOME/.dsh}"
+   npm install --prefix "$dshHome/profiles" 'https://github.com/BruceWu1126/dsh-web-background.git'
+   ```
+
+   Windows（PowerShell）：
+
    ```powershell
    $dshHome = if ($env:DSH_HOME) { $env:DSH_HOME } else { Join-Path $env:USERPROFILE '.dsh' }
    npm.cmd install --prefix (Join-Path $dshHome 'profiles') 'https://github.com/BruceWu1126/dsh-web-background.git'
    ```
-2. 在 `$dshHome\profiles\web\cordis.patch.yml` 中加入：
+
+2. 在 `$dshHome/profiles/web/cordis.patch.yml`（Windows 为 `$dshHome\profiles\web\cordis.patch.yml`）中加入：
    ```yaml
    - insert:
        - id: web-background
@@ -66,6 +100,14 @@ node install.mjs
 3. 在 DSH 安装目录的 `node_modules/@deepseek-ai/dsh-host-apiproxy/lib/index.js` 中，把 `"web-background"` 加入 `WEB_SETTINGS_NAMESPACES` 数组（**必做**，改前备份文件）。
 4. （可选）在 `node_modules/@deepseek-ai/dsh-client-ui-settings-general/lib/client.js` 的 `navIcon(id)` 中给 `id === "background"` 加一个图标分支，否则显示齿轮图标。
 5. 重启 `dsh web`，打开设置 →「背景」。
+
+## Linux 常见问题
+
+- **`profile directory not found`**：还没有跑过 Harness。先执行 `npx @deepseek-ai/dsh web`，确认 `~/.dsh/profiles/web` 存在后再安装。
+- **`dsh: command not found`**：没有全局安装 CLI。用 `npx @deepseek-ai/dsh web`，或 `npm install -g @deepseek-ai/dsh`。
+- **装到了 `/root/.dsh`**：不要用 `sudo node install.mjs`。插件必须装进你登录用户的 `~/.dsh`。
+- **自定义数据目录**：`node install.mjs --dsh-home ~/.dsh`（脚本会展开 `~`）。
+- **换到另一台 Linux / 另一个发行版**：把同一套命令再跑一遍；不要把 Windows 的 `%USERPROFILE%\.dsh` 直接拷过来当 Linux 家目录。
 
 ## 卸载
 
