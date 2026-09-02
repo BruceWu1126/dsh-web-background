@@ -116,4 +116,29 @@ function occurrences(value, needle) {
   }
 }
 
+// --help must exit 0 without touching a harness home, and mention Linux usage.
+{
+  const result = spawnSync(process.execPath, [installer, '--help'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  })
+  assert.equal(result.status, 0, result.stderr)
+  assert.match(result.stdout, /Linux \/ macOS/, 'help lists Linux usage')
+  assert.match(result.stdout, /npx @deepseek-ai\/dsh web/, 'help tells Linux users how to create ~/.dsh first')
+  assert.match(result.stdout, /Switching OS/, 'help notes that $DSH_HOME is per operating system')
+}
+
+// A quoted `~` in --dsh-home must still resolve to the login home, not a literal tilde directory.
+{
+  const missing = join('~', `dsh-wb-missing-${process.pid}`)
+  const result = spawnSync(process.execPath, [installer, '--dsh-home', missing], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  })
+  assert.notEqual(result.status, 0, 'missing expanded home still fails install')
+  assert.match(result.stderr, /profile directory not found/, 'missing profile is explained')
+  assert.doesNotMatch(result.stderr, /~\/dsh-wb-missing/, 'tilde is expanded before the error path is printed')
+  assert.match(result.stderr, process.platform === 'win32' ? /%USERPROFILE%\\\.dsh/ : /~\/\.dsh/, 'hint uses the current OS default home')
+}
+
 console.log('installer integration: all assertions passed')
