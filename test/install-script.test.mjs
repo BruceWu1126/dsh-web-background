@@ -141,4 +141,18 @@ function occurrences(value, needle) {
   assert.match(result.stderr, process.platform === 'win32' ? /%USERPROFILE%\\\.dsh/ : /~\/\.dsh/, 'hint uses the current OS default home')
 }
 
-console.log('installer integration: all assertions passed')
+// Newer dsh (0.1.1+) dropped WEB_SETTINGS_NAMESPACES; install must still succeed.
+{
+  const f = fixture()
+  try {
+    write(f.apiproxy, 'export function describe() { return settings.describe().map(namespaceView) }\n')
+    const result = run(f.dshHome)
+    assert.equal(result.status, 0, result.stderr)
+    assert.match(result.stdout, /skipping that patch/, 'missing allowlist is skipped, not fatal')
+    assert.ok(existsSync(join(f.dshHome, 'profiles', 'node_modules', 'dsh-web-background', 'lib', 'client.js')), 'plugin still copied')
+    assert.ok(readFileSync(f.profilePatch, 'utf8').includes('name: dsh-web-background'), 'profile row still added')
+    assert.equal(readFileSync(f.apiproxy, 'utf8').includes('web-background'), false, 'product file left untouched when the allowlist is gone')
+  } finally {
+    rmSync(f.root, { recursive: true, force: true })
+  }
+}

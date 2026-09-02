@@ -270,13 +270,16 @@ function doInstall() {
   // 2. profile patch row
   ok('cordis.patch.yml: ' + patchProfile())
 
-  // 3. settings allowlist (required for persistence)
+  // 3. settings allowlist (required on 0.1.0-rc.6; 0.1.1+ describes every registered namespace)
   const apiproxyDir = realProductDir('dsh-host-apiproxy')
   if (apiproxyDir === undefined) fail('cannot locate the dsh install through ' + join(modulesDir, '@deepseek-ai', 'dsh-host-apiproxy') + ' — run `npx @deepseek-ai/dsh web` once (it heals the module fallback links), then re-run')
   const apiproxyFile = join(apiproxyDir, 'lib', 'index.js')
   const apiproxyOutcome = patchProduct(apiproxyFile, APIPROXY_ANCHOR, APIPROXY_REPLACEMENT, APIPROXY_MARKER, '\t"web-background"')
-  if (apiproxyOutcome === 'anchor-missing') fail(`dsh-host-apiproxy/lib/index.js does not contain the expected WEB_SETTINGS_NAMESPACES anchor (different dsh version?) — apply the allowlist patch manually: add "web-background" to that array`)
-  ok('dsh-host-apiproxy allowlist: ' + apiproxyOutcome)
+  if (apiproxyOutcome === 'anchor-missing') {
+    warn('dsh-host-apiproxy has no WEB_SETTINGS_NAMESPACES allowlist (this dsh version exposes every registered namespace) — skipping that patch')
+  } else {
+    ok('dsh-host-apiproxy allowlist: ' + apiproxyOutcome)
+  }
 
   // 4. nav glyph (cosmetic)
   const shellDir = realProductDir('dsh-client-ui-settings-general')

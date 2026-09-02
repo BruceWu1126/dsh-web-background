@@ -13,7 +13,7 @@ DeepSeek Harness Web UI 背景自定义插件。安装后，设置面板（左�
 
 ## 兼容性
 
-当前版本针对 DeepSeek Harness `0.1.0-rc.6` 验证。Harness 仍处于开发者预览阶段，内部设置白名单或主题 token 变更后可能需要同步适配（见下文「dsh 升级后」）。
+当前版本针对 DeepSeek Harness `0.1.0-rc.6` 与 `0.1.1-rc.2` 验证。`0.1.0-rc.6` 仍依赖硬编码设置白名单；`0.1.1` 起 Host 会暴露所有已注册的 settings namespace，安装脚本会自动跳过那步补丁。Harness 仍处于开发者预览阶段，内部设置白名单或主题 token 变更后可能需要同步适配（见下文「dsh 升级后」）。
 
 ## 要求
 
@@ -68,7 +68,7 @@ node install.mjs --help
 
 1. **复制插件本体**到 `$DSH_HOME/profiles/node_modules/dsh-web-background`（profile 共享模块目录）。
 2. **注册插件行**：在 `$DSH_HOME/profiles/<profile>/cordis.patch.yml` 中追加 Loader 的 `insert` 条目。
-3. **暴露设置命名空间（必须）**：`0.1.0-rc.6` 的 Web 设置通道只服务 `dsh-host-apiproxy` 里一份**硬编码白名单**（`WEB_SETTINGS_NAMESPACES`），产品尚未提供第三方插件自声明暴露设置的机制（源码注释标注为 deferred work）。脚本把 `"web-background"` 加入该白名单——不做这步，设置页会一直显示「设置暂不可用」。
+3. **暴露设置命名空间（按版本）**：`0.1.0-rc.6` 的 Web 设置通道只服务 `dsh-host-apiproxy` 里一份**硬编码白名单**（`WEB_SETTINGS_NAMESPACES`）。脚本把 `"web-background"` 加入该白名单。`0.1.1` 起该白名单已移除（`settings.describe()` 返回全部已注册 namespace），脚本检测到后会跳过这一步而不是失败。
 4. **导航图标（可选，外观）**：设置面板导航行的图标由 `dsh-client-ui-settings-general` 硬编码，未知 id 一律回退成齿轮图标。脚本给 `background` 补一个图片图标分支。
 
 第 3、4 步会修改 DSH **安装目录**里的文件（通过 `$DSH_HOME/profiles/node_modules` 的引导回退链接定位真实位置）。每次修改前都会把原文件备份为 `<file>.dsh-wb-backup`，`--uninstall` 会原样还原。这两处补丁是当前产品版本的权宜之计，待 Harness 提供正式扩展点后即可移除。
