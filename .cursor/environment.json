@@ -1,0 +1,4 @@
+{
+  "name": "dsh-web-background",
+  "install": "npm ci"
+}
